@@ -1,0 +1,79 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0                                    # MySQL 8.0 이미지 사용
+    container_name: starmeet-mysql
+    restart: unless-stopped                             # 컨테이너 자동 재시작
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}               # 루트 패스워드
+      MYSQL_DATABASE: ${DB_NAME}                        # 데이터베이스 이름
+      MYSQL_USER: ${DB_USERNAME}                        # 사용자명
+      MYSQL_PASSWORD: ${DB_PASSWORD}                    # 사용자 패스워드
+      TZ: Asia/Seoul                                    # 타임존 설정
+    ports:
+      - "${DB_PORT}:3306"                               # 포트 매핑
+    volumes:
+      - mysql_data:/var/lib/mysql                       # 데이터 영속성
+    command:
+      - --character-set-server=utf8mb4                  # 문자셋 설정
+      - --collation-server=utf8mb4_unicode_ci           # 콜레이션 설정
+      - --default-time-zone=+09:00                      # 기본 타임존
+    networks:
+      - starmeet-network
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine                             # Redis 7.2 Alpine 이미지
+    container_name: starmeet-redis
+    restart: unless-stopped
+    # 개발 환경에서는 패스워드 없이 사용
+    ports:
+      - "${REDIS_PORT}:6379"                            # 포트 매핑
+    volumes:
+      - redis_data:/data                                # 데이터 영속성
+    networks:
+      - starmeet-network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management                     # RabbitMQ Management 플러그인 포함
+    container_name: starmeet-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}       # 기본 사용자명
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}       # 기본 패스워드
+    ports:
+      - "${RABBITMQ_PORT}:5672"                         # AMQP 포트
+      - "15672:15672"                                   # Management UI 포트
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq                 # 데이터 영속성
+    networks:
+      - starmeet-network
+
+  # Redis Commander (Redis GUI - 개발 환경용)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: starmeet-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0                   # Redis 연결 정보 (패스워드 없음)
+    ports:
+      - "8081:8081"                                     # Redis Commander UI 포트
+    depends_on:
+      - redis                                           # Redis 컨테이너 의존성
+    networks:
+      - starmeet-network
+
+# Volume 정의
+volumes:
+  mysql_data:                                           # MySQL 데이터 볼륨
+    driver: local
+  redis_data:                                           # Redis 데이터 볼륨
+    driver: local
+  rabbitmq_data:                                        # RabbitMQ 데이터 볼륨
+    driver: local
+
+# Network 정의
+networks:
+  starmeet-network:                                     # 커스텀 네트워크
+    driver: bridge
